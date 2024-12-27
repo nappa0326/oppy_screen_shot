@@ -74,12 +74,12 @@ class ScreenSelector:
         """カーソル位置にあるモニターの情報を取得"""
         cursor_x, cursor_y = pyautogui.position()
         with mss() as sct:
-            for monitor in sct.monitors[1:]:  # 最初のモニター（全画面を表す）をスキップ
-                if (monitor["left"] <= cursor_x < monitor["left"] + monitor["width"] and
-                        monitor["top"] <= cursor_y < monitor["top"] + monitor["height"]):
-                    # モニターデータにモニターの索引を追加
-                    monitor['index'] = sct.monitors.index(monitor)
-                    return monitor
+            #for monitor in sct.monitors[1:]:  # 最初のモニター（全画面を表す）をスキップ
+            #    if (monitor["left"] <= cursor_x < monitor["left"] + monitor["width"] and
+            #            monitor["top"] <= cursor_y < monitor["top"] + monitor["height"]):
+            #        # モニターデータにモニターの索引を追加
+            #        monitor['index'] = sct.monitors.index(monitor)
+            #        return monitor
 
             # カーソルがモニター上にない場合はデフォルトのモニターを返す
             monitor = sct.monitors[1]  # デフォルトはプライマリモニター
@@ -87,7 +87,7 @@ class ScreenSelector:
             # モニターデータにモニターの索引を追加
             monitor['index'] = sct.monitors.index(monitor)
 
-            return sct.monitors[1]  # デフォルトはプライマリモニター
+            return monitor  # デフォルトはプライマリモニター
 
     def update_overlay_position(self):
         """オーバーレイウィンドウの位置を更新"""
