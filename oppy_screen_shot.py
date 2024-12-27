@@ -51,6 +51,25 @@ class ScreenSelector:
         # 初期位置の設定
         self.update_overlay_position()
 
+        # 標準入力監視スレッドの開始
+        self.input_thread = threading.Thread(target=self.monitor_input)
+        self.input_thread.daemon = True
+        self.input_thread.start()
+
+    def monitor_input(self):
+        """標準入力を監視し、'exit'が入力されたら終了"""
+        while self.is_running:
+            try:
+                line = input().strip()
+                if line.lower() == 'exit':
+                    print("[OPPY-SCREEN-SHOT] Exit command received.", flush=True)
+                    # メインスレッドでウィンドウを閉じる
+                    self.root.after(0, self.on_close)
+            except EOFError:
+                break
+            except Exception as e:
+                print(f"[OPPY-SCREEN-SHOT] Input error: {e}", flush=True)
+
     def get_monitor_at_cursor(self):
         """カーソル位置にあるモニターの情報を取得"""
         cursor_x, cursor_y = pyautogui.position()
@@ -136,43 +155,71 @@ class ScreenSelector:
             # 選択範囲の座標を取得
             coords = self.canvas.coords(self.rect_id)
 
-            # 座標をモニターの相対座標に変換
-            x1 = min(coords[0], coords[2]) + self.current_monitor['left']
-            y1 = min(coords[1], coords[3]) + self.current_monitor['top']
-            x2 = max(coords[0], coords[2]) + self.current_monitor['left']
-            y2 = max(coords[1], coords[3]) + self.current_monitor['top']
+            # 選択範囲のサイズを計算
+            width = abs(coords[2] - coords[0])
+            height = abs(coords[3] - coords[1])
 
-            # スクリーンショットを撮影
-            self.capture_screenshot(int(x1), int(y1), int(x2), int(y2))
+            # 最小サイズ（10x10ピクセル）未満の場合は再選択
+            if width < 10 or height < 10:
+                print("[OPPY-SCREEN-SHOT] Selected area is too small (minimum: 10x10 pixels). Please try again.",
+                      flush=True)
+                self.reset_selection()
+                return
 
-            # アプリケーションを終了
-            self.on_close()
+            try:
+                # 座標をモニターの相対座標に変換
+                x1 = min(coords[0], coords[2]) + self.current_monitor['left']
+                y1 = min(coords[1], coords[3]) + self.current_monitor['top']
+                x2 = max(coords[0], coords[2]) + self.current_monitor['left']
+                y2 = max(coords[1], coords[3]) + self.current_monitor['top']
+
+                # スクリーンショットを撮影
+                self.capture_screenshot(int(x1), int(y1), int(x2), int(y2))
+
+                # 成功したら終了
+                self.on_close()
+
+            except Exception as e:
+                print(f"[OPPY-SCREEN-SHOT] Error capturing screenshot: {e}. Please try again.", flush=True)
+                self.reset_selection()
+
+    def reset_selection(self):
+        """選択をリセットして再選択モードに移行"""
+        # 既存の選択矩形をクリア
+        if self.rect_id:
+            self.canvas.delete(self.rect_id)
+            self.rect_id = None
+
+        # 選択状態をリセット
+        self.start_x = None
+        self.start_y = None
 
     def capture_screenshot(self, x1, y1, x2, y2):
         """指定された範囲のスクリーンショットを撮影"""
-        with mss() as sct:
-            # 撮影範囲の設定
-            monitor = {
-                "left": x1,
-                "top": y1,
-                "width": x2 - x1,
-                "height": y2 - y1
-            }
+        try:
+            with mss() as sct:
+                # 撮影範囲の設定
+                monitor = {
+                    "left": x1,
+                    "top": y1,
+                    "width": max(x2 - x1, 1),  # 幅が0以下にならないように
+                    "height": max(y2 - y1, 1)  # 高さが0以下にならないように
+                }
 
-            # スクリーンショットの撮影
-            screenshot = sct.grab(monitor)
+                # スクリーンショットの撮影
+                screenshot = sct.grab(monitor)
 
-            # スクリーンショットの画像ファイルのファイル名を作成
-            # oppy_screen_shot.[年月日時分秒].png
-            #now = time.strftime('%Y%m%d%H%M%S')
-            #file_name = 'oppy_screen_shot.' + now + '.png'
-            # 一旦ファイル名はoppy_screen_shot.pngに固定
-            file_name = 'oppy_screen_shot.png'
+                # 一旦ファイル名はoppy_screen_shot.pngに固定
+                file_name = 'oppy_screen_shot.png'
 
-            # PIL Imageに変換して保存
-            img = Image.frombytes('RGB', screenshot.size, screenshot.rgb)
-            img.save(file_name)
-            print("[OPPY-SCREEN-SHOT] Captured:", file_name, flush=True)
+                # PIL Imageに変換して保存
+                img = Image.frombytes('RGB', screenshot.size, screenshot.rgb)
+                img.save(file_name)
+                print("[OPPY-SCREEN-SHOT] Captured:", file_name, flush=True)
+
+        except Exception as e:
+            print(f"[OPPY-SCREEN-SHOT] Error saving screenshot: {e}", flush=True)
+            raise  # エラーを上位に伝播させて再選択を促す
 
     def on_escape(self, event):
         """ESCキー押下時の処理"""
@@ -181,6 +228,9 @@ class ScreenSelector:
 
     def on_close(self):
         """アプリケーション終了時の処理"""
+        if not self.is_running:  # 既に終了処理が実行されている場合は無視
+            return
+
         print("[OPPY-SCREEN-SHOT] Closed.", flush=True)
         self.is_running = False
         self.overlay.destroy()
