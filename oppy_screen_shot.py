@@ -58,7 +58,16 @@ class ScreenSelector:
             for monitor in sct.monitors[1:]:  # 最初のモニター（全画面を表す）をスキップ
                 if (monitor["left"] <= cursor_x < monitor["left"] + monitor["width"] and
                         monitor["top"] <= cursor_y < monitor["top"] + monitor["height"]):
+                    # モニターデータにモニターの索引を追加
+                    monitor['index'] = sct.monitors.index(monitor)
                     return monitor
+
+            # カーソルがモニター上にない場合はデフォルトのモニターを返す
+            monitor = sct.monitors[1]  # デフォルトはプライマリモニター
+
+            # モニターデータにモニターの索引を追加
+            monitor['index'] = sct.monitors.index(monitor)
+
             return sct.monitors[1]  # デフォルトはプライマリモニター
 
     def update_overlay_position(self):
@@ -69,6 +78,7 @@ class ScreenSelector:
         if (not self.current_monitor or
                 new_monitor['left'] != self.current_monitor['left'] or
                 new_monitor['top'] != self.current_monitor['top']):
+            print("[OPPY-SCREEN-SHOT] Moved to monitor:", new_monitor['index'], flush=True)
 
             self.current_monitor = new_monitor
 
@@ -162,14 +172,16 @@ class ScreenSelector:
             # PIL Imageに変換して保存
             img = Image.frombytes('RGB', screenshot.size, screenshot.rgb)
             img.save(file_name)
-            print("スクリーンショットを保存しました: screenshot.png")
+            print("[OPPY-SCREEN-SHOT] Captured:", file_name, flush=True)
 
     def on_escape(self, event):
         """ESCキー押下時の処理"""
+        print("[OPPY-SCREEN-SHOT] Canceled.", flush=True)
         self.on_close()
 
     def on_close(self):
         """アプリケーション終了時の処理"""
+        print("[OPPY-SCREEN-SHOT] Closed.", flush=True)
         self.is_running = False
         self.overlay.destroy()
         self.root.quit()
@@ -180,5 +192,6 @@ class ScreenSelector:
 
 
 if __name__ == "__main__":
+    print("[OPPY-SCREEN-SHOT] Started.", flush=True)
     selector = ScreenSelector()
     selector.run()
