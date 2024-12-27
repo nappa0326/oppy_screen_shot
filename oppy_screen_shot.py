@@ -4,6 +4,8 @@ from mss import mss
 import pyautogui
 import time
 import threading
+import sys
+import os
 
 
 class ScreenSelector:
@@ -60,7 +62,8 @@ class ScreenSelector:
         """標準入力を監視し、'exit'が入力されたら終了"""
         while self.is_running:
             try:
-                line = input().strip()
+                # バッファリングなしで標準入力を読み込む
+                line = sys.stdin.readline().strip()
                 if line.lower() == 'exit':
                     print("[OPPY-SCREEN-SHOT] Exit command received.", flush=True)
                     # メインスレッドでウィンドウを閉じる
@@ -74,12 +77,12 @@ class ScreenSelector:
         """カーソル位置にあるモニターの情報を取得"""
         cursor_x, cursor_y = pyautogui.position()
         with mss() as sct:
-            #for monitor in sct.monitors[1:]:  # 最初のモニター（全画面を表す）をスキップ
-            #    if (monitor["left"] <= cursor_x < monitor["left"] + monitor["width"] and
-            #            monitor["top"] <= cursor_y < monitor["top"] + monitor["height"]):
-            #        # モニターデータにモニターの索引を追加
-            #        monitor['index'] = sct.monitors.index(monitor)
-            #        return monitor
+            for monitor in sct.monitors[1:]:  # 最初のモニター（全画面を表す）をスキップ
+                if (monitor["left"] <= cursor_x < monitor["left"] + monitor["width"] and
+                        monitor["top"] <= cursor_y < monitor["top"] + monitor["height"]):
+                    # モニターデータにモニターの索引を追加
+                    monitor['index'] = sct.monitors.index(monitor)
+                    return monitor
 
             # カーソルがモニター上にない場合はデフォルトのモニターを返す
             monitor = sct.monitors[1]  # デフォルトはプライマリモニター
@@ -209,12 +212,22 @@ class ScreenSelector:
                 # スクリーンショットの撮影
                 screenshot = sct.grab(monitor)
 
-                # 一旦ファイル名はoppy_screen_shot.pngに固定
-                file_name = 'oppy_screen_shot.png'
+                # 画像ファイルの格納ディレクトリ名を設定
+                img_files_dir = 'img_files'
+
+                # 実行ファイルと同じ階層に画像ファイルの格納ディレクトリが存在しない場合は作成
+                if not os.path.exists(img_files_dir):
+                    os.makedirs(img_files_dir)
+
+                # ファイル名はoppy_screen_shot.[年月日時分秒].png
+                file_name = f"oppy_screen_shot.{time.strftime('%Y%m%d%H%M%S')}.png"
+
+                # 画像の格納ディレクトリからスクリーンショットのファイル名称を作成
+                file_path = f"{img_files_dir}/{file_name}"
 
                 # PIL Imageに変換して保存
                 img = Image.frombytes('RGB', screenshot.size, screenshot.rgb)
-                img.save(file_name)
+                img.save(file_path)
                 print("[OPPY-SCREEN-SHOT] Captured:", file_name, flush=True)
 
         except Exception as e:
