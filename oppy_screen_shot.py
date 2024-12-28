@@ -32,7 +32,8 @@ class ScreenSelector:
         self.canvas = tk.Canvas(
             self.overlay,
             highlightthickness=0,
-            bg='black'
+            bg='black',
+            cursor='cross'
         )
         self.canvas.pack(fill=tk.BOTH, expand=True)
 
@@ -200,6 +201,13 @@ class ScreenSelector:
     def capture_screenshot(self, x1, y1, x2, y2):
         """指定された範囲のスクリーンショットを撮影"""
         try:
+            # キャプチャ前にオーバーレイを一時的に非表示
+            self.overlay.withdraw()
+
+            # 画面の更新を確実に行うため少し待機
+            self.overlay.update()
+            time.sleep(0.1)  # 100ミリ秒待機
+
             with mss() as sct:
                 # 撮影範囲の設定
                 monitor = {
@@ -229,11 +237,13 @@ class ScreenSelector:
                 img = Image.frombytes('RGB', screenshot.size, screenshot.rgb)
                 img.save(file_path)
                 print("[OPPY-SCREEN-SHOT] Captured:", file_name, flush=True)
-
         except Exception as e:
             print(f"[OPPY-SCREEN-SHOT] Error saving screenshot: {e}", flush=True)
             raise  # エラーを上位に伝播させて再選択を促す
-
+        finally:
+            # エラーの有無に関わらずオーバーレイを再表示（ただし終了処理中の場合は不要）
+            if self.is_running:
+                self.overlay.deiconify()
     def on_escape(self, event):
         """ESCキー押下時の処理"""
         print("[OPPY-SCREEN-SHOT] Canceled.", flush=True)
